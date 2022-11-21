@@ -1,13 +1,14 @@
 ﻿#include<Windows.h>
 #include<iostream>
 #include<vector>
+#include<thread>
 #include"Timer.hpp"
 
 #define DEBUG 0
 
 //Variables used for timing.
 Timer timer;
-Timer timer_186;
+Timer timer_VK_OEM_1;
 
 // List of possible keystates
 enum KeyState {
@@ -41,25 +42,23 @@ const uint16_t MAX_KEYPRESSES = 2;
 //Holds MAX_KEYPRESSES last key presses
 std::vector<KeyPress> KeyPresses;
 
-bool allow_next_186 = false;
+bool allow_next_VK_OEM_1 = false;
 
-bool await_186() {
-    auto total_time = timer_186.GetDelta();
-    while (total_time <= 10) {
-        total_time += timer.GetDelta();
-        for (size_t i = 0; i < KeyPresses.size(); i++) {
-            if (i + 1 <= KeyPresses.size()) {
-                KeyPress kp0 = KeyPresses[i];
-                KeyPress kp1 = KeyPresses[i + 1];
-                if (kp0.code == 186 && kp1.code == 222 && kp1.delta < 5) {
-                    return 0;
-                }
-
-            }
-        }
-    }
-    return 1;
-}
+//bool await_VK_OEM_1() {
+//    auto total_time = timer_VK_OEM_1.GetDelta();
+//    while (total_time <= 10) {
+//        total_time += timer.GetDelta();
+//        for (size_t i = 0; i < KeyPresses.size(); i++) {
+//            if (i + 1 <= KeyPresses.size()) {
+//                KeyPress kp0 = KeyPresses[i];
+//                KeyPress kp1 = KeyPresses[i + 1];
+//                if (kp0.code == VK_OEM_1 && kp1.code == VK_OEM_7 && kp1.delta < 5)
+//                    return 0;
+//            }
+//        }
+//    }
+//    return 1;
+//}
 
 /*
 1. Add KeyPress to the vector.
@@ -70,12 +69,11 @@ return false if not
 */
 bool ParseKeyPress(KeyPress kp) {
     //std::cout << "New Key Press: " << kp.delta << ' ' << kp.state << ' ' << kp.code << '\n';
-
     if (kp.state != 0)
         return 1;
     KeyPresses.push_back(kp);
     
-    if (kp.delta <= 5 &&kp.code == 219) {
+    if (kp.delta <= 5 &&kp.code == VK_OEM_4) {
         KeyPresses.clear();
         return 0;
     }
@@ -84,40 +82,41 @@ bool ParseKeyPress(KeyPress kp) {
         if (i + 1 <= KeyPresses.size()) {
             KeyPress kp0 = KeyPresses[i];
             KeyPress kp1 = KeyPresses[i + 1];
-            if (kp0.code == 186 && kp1.code != 222 && kp1.delta > 5) {
+            if (kp0.code == VK_OEM_1 && kp1.code != VK_OEM_7 && kp1.delta > 5) {
                 INPUT ip;
-
+                
                 // Set up a generic keyboard event.
                 ip.type = INPUT_KEYBOARD;
                 ip.ki.wScan = 0; // hardware scan code for key
-                ip.ki.time = 0;
+                ip.ki.time = 1;
                 ip.ki.dwExtraInfo = 0;
-
+                
                 // Press the ";" key
-                ip.ki.wVk = 186; // virtual-key code for the ";" key
+                ip.ki.wVk = VK_OEM_1; // virtual-key code for the ";" key
                 ip.ki.dwFlags = 0; // 0 for key press
                 SendInput(1, &ip, sizeof(INPUT));
 
-                // Release the ";" key
-                ip.ki.dwFlags = KEYEVENTF_KEYUP; // KEYEVENTF_KEYUP for key release
-                SendInput(1, &ip, sizeof(INPUT));
-
+                //Possibly useless
+                //// Release the ";" key
+                //ip.ki.dwFlags = KEYEVENTF_KEYUP; // KEYEVENTF_KEYUP for key release
+                //SendInput(1, &ip, sizeof(INPUT));
+                
                 KeyPresses.clear();
 
             }
 
         }
     }
-
-    if (kp.code == 186) {
-        if (allow_next_186) {
-            allow_next_186 = false;
+  
+    if (kp.code == VK_OEM_1) {
+        if (allow_next_VK_OEM_1) {
+            allow_next_VK_OEM_1 = false;
             return 1;
         }
         KeyPresses.clear();
         KeyPresses.push_back(kp);
-        //186 - ;
-        //0 0 222 - '
+        //VK_OEM_1 - ;
+        //0 0 VK_OEM_7 - '
         //KeyPresses.clear();
         return 0;
     }
@@ -143,13 +142,12 @@ bool ParseKeyPress(KeyPress kp) {
 }
 
 int64_t proc(int code, WPARAM key_state, LPARAM key_id) {
-
+    
     auto kp = newKeyPress(key_state, key_id);
 
-    if (ParseKeyPress(kp)) {
-        //return success, pass to the next hook in the chain
+    //return success, pass to the next hook in the chain
+    if (ParseKeyPress(kp))
         return CallNextHookEx(NULL, code, key_state, key_id);
-    }
     return -1; //don't pass
 }
 
