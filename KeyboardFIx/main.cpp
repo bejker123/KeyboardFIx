@@ -1,38 +1,13 @@
 ﻿#include<Windows.h>
 #include<iostream>
-#include<chrono>
 #include<vector>
-#include<thread>
+#include"Timer.hpp"
 
 #define DEBUG 0
 
-//Get current time in milliseconds.
-int64_t inline GetTime()  {
-    auto duration = std::chrono::system_clock::now().time_since_epoch();
-    return std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
-}
-
 //Variables used for timing.
-int64_t t = GetTime();
-int64_t _t = t;
-int64_t delta;
-
-int64_t t1 = GetTime();
-int64_t _t1 = t1;
-int64_t delta1;
-
-int64_t GetDelta() {
-    _t = t;
-    t = GetTime();
-    return (delta = (t - _t));
-}
-
-int64_t GetDelta1() {
-    _t1 = t1;
-    t1 = GetTime();
-    return (delta1 = (t1 - _t1));
-}
-
+Timer timer;
+Timer timer_186;
 
 // List of possible keystates
 enum KeyState {
@@ -57,7 +32,7 @@ KeyPress newKeyPress(WPARAM key_state, LPARAM key_id) {
     else if (key_state != 0x100)
         kp.state = INVALID;
     kp.code = key_code->vkCode;
-    kp.delta = GetDelta();
+    kp.delta = timer.GetDelta();
     return kp;
 }
 
@@ -69,9 +44,9 @@ std::vector<KeyPress> KeyPresses;
 bool allow_next_186 = false;
 
 bool await_186() {
-    auto total_time = GetDelta1();
+    auto total_time = timer_186.GetDelta();
     while (total_time <= 10) {
-        total_time += GetDelta1();
+        total_time += timer.GetDelta();
         for (size_t i = 0; i < KeyPresses.size(); i++) {
             if (i + 1 <= KeyPresses.size()) {
                 KeyPress kp0 = KeyPresses[i];
@@ -106,9 +81,9 @@ bool ParseKeyPress(KeyPress kp) {
     }
 
     for (size_t i = 0; i < KeyPresses.size(); i++) {
-        if(i+1 <= KeyPresses.size()){
+        if (i + 1 <= KeyPresses.size()) {
             KeyPress kp0 = KeyPresses[i];
-            KeyPress kp1 = KeyPresses[i+1];
+            KeyPress kp1 = KeyPresses[i + 1];
             if (kp0.code == 186 && kp1.code != 222 && kp1.delta > 5) {
                 INPUT ip;
 
@@ -215,7 +190,7 @@ auto WinMain(
     //    hinstDLL,
     //    0);
     */
-
+    
     auto hook = SetWindowsHookEx(WH_KEYBOARD_LL, proc, NULL, 0);
 
     MSG msg = { 0 };
